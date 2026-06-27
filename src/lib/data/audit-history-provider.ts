@@ -8,6 +8,7 @@ import {
 import type { Audit, AuditAnswer } from "@/lib/types";
 
 const APPWRITE_READ_TIMEOUT_MS = 3000;
+const SHOULD_USE_MOCK_FALLBACK = process.env.NODE_ENV !== "production";
 
 export async function getAuditHistory() {
   try {
@@ -16,8 +17,14 @@ export async function getAuditHistory() {
       APPWRITE_READ_TIMEOUT_MS,
     );
 
-    return sortAudits(audits.length > 0 ? audits : mockAudits);
-  } catch {
+    return sortAudits(
+      audits.length > 0 || !SHOULD_USE_MOCK_FALLBACK ? audits : mockAudits,
+    );
+  } catch (error) {
+    if (!SHOULD_USE_MOCK_FALLBACK) {
+      throw error;
+    }
+
     return sortAudits(mockAudits);
   }
 }
@@ -31,11 +38,16 @@ export async function getAuditHistoryWithAnswers(): Promise<
       APPWRITE_READ_TIMEOUT_MS,
     );
 
-    if (audits.length === 0) {
+    if (audits.length === 0 && SHOULD_USE_MOCK_FALLBACK) {
       return buildAuditsWithAnswers(mockAudits, getMockAuditAnswers());
     }
+
     return buildAuditsWithAnswers(audits, answers);
-  } catch {
+  } catch (error) {
+    if (!SHOULD_USE_MOCK_FALLBACK) {
+      throw error;
+    }
+
     return buildAuditsWithAnswers(mockAudits, getMockAuditAnswers());
   }
 }

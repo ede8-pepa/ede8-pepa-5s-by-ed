@@ -37,6 +37,8 @@ type ReadResult<T> = {
 const APPWRITE_READ_FETCH_TIMEOUT_MS = 3000;
 const APPWRITE_WRITE_FETCH_TIMEOUT_MS = 30000;
 const APPWRITE_STORAGE_FETCH_TIMEOUT_MS = 60000;
+const APPWRITE_AUDITS_LIST_LIMIT = 100;
+const APPWRITE_AUDIT_ANSWERS_LIST_LIMIT = 500;
 
 export async function readAppwriteZones(): Promise<Zone[]> {
   const zones = await readCollection(appwriteConfig.collections.zones, mapZone);
@@ -47,6 +49,13 @@ export async function readAppwriteAudits(): Promise<Audit[]> {
   const audits = await readCollection(
     appwriteConfig.collections.audits,
     mapAudit,
+    {
+      "queries[]": [
+        createOrderDescQuery("$createdAt"),
+        createLimitQuery(APPWRITE_AUDITS_LIST_LIMIT),
+      ],
+    },
+    "no-store",
   );
   return audits.documents;
 }
@@ -61,7 +70,13 @@ export async function readAppwriteAuditAnswers(
   const answers = await readCollection(
     appwriteConfig.collections.auditAnswers,
     mapAuditAnswer,
-    { "queries[]": createEqualQuery("audit_id", auditId) },
+    {
+      "queries[]": [
+        createEqualQuery("audit_id", auditId),
+        createLimitQuery(APPWRITE_AUDITS_LIST_LIMIT),
+      ],
+    },
+    "no-store",
   );
   return answers.documents;
 }
@@ -70,6 +85,10 @@ export async function readAppwriteAllAuditAnswers(): Promise<AuditAnswer[]> {
   const answers = await readCollection(
     appwriteConfig.collections.auditAnswers,
     mapAuditAnswer,
+    {
+      "queries[]": [createLimitQuery(APPWRITE_AUDIT_ANSWERS_LIST_LIMIT)],
+    },
+    "no-store",
   );
   return answers.documents;
 }
@@ -594,11 +613,27 @@ function stringFrom(value: unknown) {
 }
 
 function createEqualQuery(attribute: string, value: string) {
-  return `equal("${escapeQueryString(attribute)}", ["${escapeQueryString(value)}"])`;
+  return createAppwriteQuery("equal", attribute, [value]);
 }
 
-function escapeQueryString(value: string) {
-  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+function createOrderDescQuery(attribute: string) {
+  return createAppwriteQuery("orderDesc", attribute);
+}
+
+function createLimitQuery(limit: number) {
+  return createAppwriteQuery("limit", undefined, [limit]);
+}
+
+function createAppwriteQuery(
+  method: string,
+  attribute?: string,
+  values?: Array<string | number | boolean>,
+) {
+  return JSON.stringify({
+    method,
+    attribute,
+    values,
+  });
 }
 
 function filterPhotosByContext(
