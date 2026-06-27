@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { CorrectiveActionForm } from "@/components/corrective-action-form";
 import { PageHeader } from "@/components/page-header";
+import { PhotoManager } from "@/components/photo-tools";
 import {
   countAuditFindings,
   getAuditFindingStatus,
@@ -11,6 +12,10 @@ import {
   getAuditDetail,
   getAuditNavigation,
 } from "@/lib/data/audit-history-provider";
+import { readAppwritePhotos } from "@/lib/data/appwrite-service";
+import type { PhotoMetadata } from "@/lib/types";
+
+console.log("[build-trace] src/app/historique/[id]/page.tsx module loaded");
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +24,19 @@ export default async function AuditDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  console.log("[build-trace] AuditDetailPage start");
   const { id } = await params;
   const { audit, answers } = await getAuditDetail(id);
   const navigation = await getAuditNavigation(id);
   const status = audit ? getAuditScoreStatus(audit.scorePercent) : undefined;
   const findingCounts = countAuditFindings(answers);
+  const photos = audit ? await readPhotosSafely("audit", audit.$id) : [];
+  console.log("[build-trace] AuditDetailPage data loaded", {
+    id,
+    found: Boolean(audit),
+    answers: answers.length,
+    photos: photos.length,
+  });
 
   if (!audit) {
     return (
@@ -61,6 +74,15 @@ export default async function AuditDetailPage({
         <FindingsSummary counts={findingCounts} />
       </section>
 
+      <PhotoManager
+        moduleType="audit"
+        entityId={audit.$id}
+        zoneId={audit.zoneId}
+        initialPhotos={photos}
+        title="Photos de l'audit"
+        emptyLabel="Aucune photo enregistrée pour cet audit."
+      />
+
       <section className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-5 py-4">
           <h2 className="text-lg font-black text-slate-950">
@@ -86,6 +108,17 @@ export default async function AuditDetailPage({
       </section>
     </AppShell>
   );
+}
+
+async function readPhotosSafely(
+  moduleType: "audit",
+  entityId: string,
+): Promise<PhotoMetadata[]> {
+  try {
+    return await readAppwritePhotos(moduleType, entityId);
+  } catch {
+    return [];
+  }
 }
 
 function AuditNavigation({

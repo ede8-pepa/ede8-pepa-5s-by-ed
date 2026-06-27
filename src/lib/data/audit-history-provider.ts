@@ -9,7 +9,10 @@ import type { Audit, AuditAnswer } from "@/lib/types";
 
 const APPWRITE_READ_TIMEOUT_MS = 3000;
 
+console.log("[build-trace] audit-history-provider module loaded");
+
 export async function getAuditHistory() {
+  console.log("[build-trace] getAuditHistory start");
   try {
     const audits = await withTimeout(
       readAppwriteAudits(),
@@ -18,6 +21,7 @@ export async function getAuditHistory() {
 
     return sortAudits(audits.length > 0 ? audits : mockAudits);
   } catch {
+    console.log("[build-trace] getAuditHistory fallback");
     return sortAudits(mockAudits);
   }
 }
@@ -25,6 +29,7 @@ export async function getAuditHistory() {
 export async function getAuditHistoryWithAnswers(): Promise<
   Array<Audit & { answers: AuditAnswer[] }>
 > {
+  console.log("[build-trace] getAuditHistoryWithAnswers start");
   try {
     const [audits, answers] = await withTimeout(
       Promise.all([readAppwriteAudits(), readAppwriteAllAuditAnswers()]),
@@ -32,11 +37,14 @@ export async function getAuditHistoryWithAnswers(): Promise<
     );
 
     if (audits.length === 0) {
+      console.log("[build-trace] getAuditHistoryWithAnswers mock empty");
       return buildAuditsWithAnswers(mockAudits, getMockAuditAnswers());
     }
 
+    console.log("[build-trace] getAuditHistoryWithAnswers appwrite done");
     return buildAuditsWithAnswers(audits, answers);
   } catch {
+    console.log("[build-trace] getAuditHistoryWithAnswers fallback");
     return buildAuditsWithAnswers(mockAudits, getMockAuditAnswers());
   }
 }
@@ -46,6 +54,7 @@ export async function getAuditDetail(auditId: string): Promise<{
   answers: AuditAnswer[];
   source: "appwrite";
 }> {
+  console.log("[build-trace] getAuditDetail start", auditId);
   let audit: Audit | undefined;
 
   try {
@@ -54,6 +63,7 @@ export async function getAuditDetail(auditId: string): Promise<{
       APPWRITE_READ_TIMEOUT_MS,
     );
   } catch {
+    console.log("[build-trace] getAuditDetail audit fallback", auditId);
     return {
       audit: undefined,
       answers: [],
@@ -67,12 +77,14 @@ export async function getAuditDetail(auditId: string): Promise<{
       APPWRITE_READ_TIMEOUT_MS,
     );
 
+    console.log("[build-trace] getAuditDetail answers done", auditId);
     return {
       audit,
       answers,
       source: "appwrite",
     };
   } catch {
+    console.log("[build-trace] getAuditDetail answers fallback", auditId);
     return {
       audit,
       answers: [],
@@ -85,6 +97,7 @@ export async function getAuditNavigation(auditId: string): Promise<{
   previousAudit: Audit | undefined;
   nextAudit: Audit | undefined;
 }> {
+  console.log("[build-trace] getAuditNavigation start", auditId);
   const audits = await getAuditHistory();
   const currentIndex = audits.findIndex((audit) => audit.$id === auditId);
 

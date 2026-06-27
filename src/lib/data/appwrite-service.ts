@@ -4,6 +4,10 @@ import {
   createCollectionUrl,
   createCollectionUrlWithParams,
   createDocumentUrl,
+  createStorageFilePreviewUrl,
+  createStorageFileUrl,
+  createStorageFilesUrl,
+  createStorageFileViewUrl,
 } from "@/lib/appwrite";
 import type {
   Audit,
@@ -13,6 +17,9 @@ import type {
   CreateAuditAnswerInput,
   CreateAuditInput,
   CreateCorrectiveActionInput,
+  CreatePhotoMetadataInput,
+  PhotoMetadata,
+  PhotoModuleType,
   Standard,
   Zone,
 } from "@/lib/types";
@@ -27,16 +34,26 @@ type ReadResult<T> = {
   hasDocuments: boolean;
 };
 
+console.log("[build-trace] appwrite-service module loaded");
+
+const APPWRITE_READ_FETCH_TIMEOUT_MS = 3000;
+const APPWRITE_WRITE_FETCH_TIMEOUT_MS = 30000;
+const APPWRITE_STORAGE_FETCH_TIMEOUT_MS = 60000;
+
 export async function readAppwriteZones(): Promise<Zone[]> {
+  console.log("[build-trace] readAppwriteZones start");
   const zones = await readCollection(appwriteConfig.collections.zones, mapZone);
+  console.log("[build-trace] readAppwriteZones done", zones.documents.length);
   return zones.documents;
 }
 
 export async function readAppwriteAudits(): Promise<Audit[]> {
+  console.log("[build-trace] readAppwriteAudits start");
   const audits = await readCollection(
     appwriteConfig.collections.audits,
     mapAudit,
   );
+  console.log("[build-trace] readAppwriteAudits done", audits.documents.length);
   return audits.documents;
 }
 
@@ -97,11 +114,16 @@ export async function createAuditAnswers(
 export async function readAppwriteCorrectiveActions(): Promise<
   CorrectiveAction[]
 > {
+  console.log("[build-trace] readAppwriteCorrectiveActions start");
   const actions = await readCollection(
     appwriteConfig.collections.correctiveActions,
     mapCorrectiveAction,
     undefined,
     "no-store",
+  );
+  console.log(
+    "[build-trace] readAppwriteCorrectiveActions done",
+    actions.documents.length,
   );
   return actions.documents;
 }
@@ -137,10 +159,12 @@ export async function createCorrectiveAction(
 }
 
 export async function readAppwriteStandards(): Promise<Standard[]> {
+  console.log("[build-trace] readAppwriteStandards start");
   const standards = await readCollection(
     appwriteConfig.collections.standards,
     mapStandard,
   );
+  console.log("[build-trace] readAppwriteStandards done", standards.documents.length);
   return standards.documents;
 }
 
@@ -171,22 +195,141 @@ export async function updateCorrectiveActionStatus(
   return mapCorrectiveAction(document);
 }
 
+export async function readAppwritePhotos(
+  moduleType: PhotoModuleType,
+  entityId: string,
+): Promise<PhotoMetadata[]> {
+  console.log("[build-trace] readAppwritePhotos start", {
+    moduleType,
+    entityId,
+  });
+  const photos = await readCollection(
+    appwriteConfig.collections.photos,
+    mapPhotoMetadata,
+    {
+      "queries[]": [
+        createEqualQuery("module_type", moduleType),
+        createEqualQuery("entity_id", entityId),
+      ],
+    },
+    "no-store",
+  );
+
+  console.log("[build-trace] readAppwritePhotos done", photos.documents.length);
+  return photos.documents.filter((photo) => !photo.deletedAt);
+}
+
+export async function readAppwritePhoto(photoId: string): Promise<PhotoMetadata> {
+  return readDocument(
+    appwriteConfig.collections.photos,
+    photoId,
+    mapPhotoMetadata,
+    "no-store",
+  );
+}
+
+export async function uploadAppwritePhotoFile(file: File): Promise<{
+  fileId: string;
+}> {
+  const fileId = crypto.randomUUID();
+  const formData = new FormData();
+  formData.set("fileId", fileId);
+  formData.set("file", file);
+
+  const response = await fetchWithTimeout(
+    createStorageFilesUrl(),
+    {
+      method: "POST",
+      headers: createAppwriteHeaders(""),
+      body: formData,
+    },
+    APPWRITE_STORAGE_FETCH_TIMEOUT_MS,
+  );
+
+  if (!response.ok) {
+    const message = await readAppwriteError(response);
+    throw new Error(message);
+  }
+
+  const payload = (await response.json()) as { $id?: string };
+
+  return {
+    fileId: stringFrom(payload.$id ?? fileId),
+  };
+}
+
+export async function createPhotoMetadata(
+  input: CreatePhotoMetadataInput,
+): Promise<PhotoMetadata> {
+  const document = await createDocument(
+    appwriteConfig.collections.photos,
+    compactData({
+      file_id: input.fileId,
+      module_type: input.moduleType,
+      entity_id: input.entityId,
+      company_id: input.companyId,
+      site_id: input.siteId,
+      zone_id: input.zoneId,
+      uploaded_by: input.uploadedBy,
+      file_name: input.fileName,
+      file_size: input.fileSize,
+      mime_type: input.mimeType,
+      storage_path: input.storagePath,
+    }),
+  );
+
+  return mapPhotoMetadata(document);
+}
+
+export async function deleteAppwritePhoto(photoId: string) {
+  const photo = await readAppwritePhoto(photoId);
+
+  await deleteStorageFile(photo.fileId);
+  await deleteDocument(appwriteConfig.collections.photos, photoId);
+}
+
+export async function readPhotoFileResponse(
+  fileId: string,
+  variant: "thumb" | "full",
+) {
+  const url =
+    variant === "thumb"
+      ? `${createStorageFilePreviewUrl(fileId)}?width=360&height=360&gravity=center&quality=70`
+      : createStorageFileViewUrl(fileId);
+  const response = await fetchWithTimeout(
+    url,
+    {
+      headers: createAppwriteHeaders(""),
+      cache: "no-store",
+    },
+    APPWRITE_STORAGE_FETCH_TIMEOUT_MS,
+  );
+
+  if (!response.ok) {
+    const message = await readAppwriteError(response);
+    throw new Error(message);
+  }
+
+  return response;
+}
+
 async function readCollection<T>(
   collectionId: string,
   mapDocument: (document: AppwriteDocument) => T,
-  params?: Record<string, string>,
+  params?: Record<string, string | string[]>,
   cacheMode: "revalidate" | "no-store" = "revalidate",
 ): Promise<ReadResult<T>> {
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     params
       ? createCollectionUrlWithParams(collectionId, params)
       : createCollectionUrl(collectionId),
     {
       headers: createAppwriteHeaders(),
       ...(cacheMode === "no-store"
-        ? { cache: "no-store" as const }
-        : { next: { revalidate: 60 } }),
+          ? { cache: "no-store" as const }
+          : { next: { revalidate: 60 } }),
     },
+    APPWRITE_READ_FETCH_TIMEOUT_MS,
   );
 
   if (!response.ok) {
@@ -210,12 +353,16 @@ async function readDocument<T>(
   mapDocument: (document: AppwriteDocument) => T,
   cacheMode: "revalidate" | "no-store" = "revalidate",
 ): Promise<T> {
-  const response = await fetch(createDocumentUrl(collectionId, documentId), {
-    headers: createAppwriteHeaders(),
-    ...(cacheMode === "no-store"
-      ? { cache: "no-store" as const }
-      : { next: { revalidate: 60 } }),
-  });
+  const response = await fetchWithTimeout(
+    createDocumentUrl(collectionId, documentId),
+    {
+      headers: createAppwriteHeaders(),
+      ...(cacheMode === "no-store"
+        ? { cache: "no-store" as const }
+        : { next: { revalidate: 60 } }),
+    },
+    APPWRITE_READ_FETCH_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     throw new Error(`Appwrite read failed for ${collectionId}/${documentId}`);
@@ -228,14 +375,18 @@ async function createDocument(
   collectionId: string,
   data: Record<string, unknown>,
 ): Promise<AppwriteDocument> {
-  const response = await fetch(createCollectionUrl(collectionId), {
-    method: "POST",
-    headers: createAppwriteHeaders(),
-    body: JSON.stringify({
-      documentId: "unique()",
-      data,
-    }),
-  });
+  const response = await fetchWithTimeout(
+    createCollectionUrl(collectionId),
+    {
+      method: "POST",
+      headers: createAppwriteHeaders(),
+      body: JSON.stringify({
+        documentId: "unique()",
+        data,
+      }),
+    },
+    APPWRITE_WRITE_FETCH_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     const message = await readAppwriteError(response);
@@ -250,11 +401,15 @@ async function updateDocument(
   documentId: string,
   data: Record<string, unknown>,
 ): Promise<AppwriteDocument> {
-  const response = await fetch(createDocumentUrl(collectionId, documentId), {
-    method: "PATCH",
-    headers: createAppwriteHeaders(),
-    body: JSON.stringify({ data }),
-  });
+  const response = await fetchWithTimeout(
+    createDocumentUrl(collectionId, documentId),
+    {
+      method: "PATCH",
+      headers: createAppwriteHeaders(),
+      body: JSON.stringify({ data }),
+    },
+    APPWRITE_WRITE_FETCH_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     const message = await readAppwriteError(response);
@@ -262,6 +417,38 @@ async function updateDocument(
   }
 
   return (await response.json()) as AppwriteDocument;
+}
+
+async function deleteDocument(collectionId: string, documentId: string) {
+  const response = await fetchWithTimeout(
+    createDocumentUrl(collectionId, documentId),
+    {
+      method: "DELETE",
+      headers: createAppwriteHeaders(),
+    },
+    APPWRITE_WRITE_FETCH_TIMEOUT_MS,
+  );
+
+  if (!response.ok) {
+    const message = await readAppwriteError(response);
+    throw new Error(message);
+  }
+}
+
+async function deleteStorageFile(fileId: string) {
+  const response = await fetchWithTimeout(
+    createStorageFileUrl(fileId),
+    {
+      method: "DELETE",
+      headers: createAppwriteHeaders(""),
+    },
+    APPWRITE_STORAGE_FETCH_TIMEOUT_MS,
+  );
+
+  if (!response.ok) {
+    const message = await readAppwriteError(response);
+    throw new Error(message);
+  }
 }
 
 function mapZone(document: AppwriteDocument): Zone {
@@ -321,6 +508,26 @@ function mapCorrectiveAction(document: AppwriteDocument): CorrectiveAction {
     status: correctiveActionStatusFrom(document.status),
     createdAt: optionalString(document.$createdAt),
     closedAt: optionalString(document.closed_at),
+  };
+}
+
+function mapPhotoMetadata(document: AppwriteDocument): PhotoMetadata {
+  return {
+    $id: document.$id,
+    id: document.$id,
+    fileId: stringFrom(document.file_id),
+    moduleType: photoModuleTypeFrom(document.module_type),
+    entityId: stringFrom(document.entity_id),
+    companyId: optionalString(document.company_id),
+    siteId: optionalString(document.site_id),
+    zoneId: optionalString(document.zone_id),
+    uploadedBy: optionalString(document.uploaded_by),
+    createdAt: optionalString(document.$createdAt),
+    fileName: stringFrom(document.file_name),
+    fileSize: numberFrom(document.file_size, 0),
+    mimeType: stringFrom(document.mime_type),
+    storagePath: optionalString(document.storage_path),
+    deletedAt: optionalString(document.deleted_at),
   };
 }
 
@@ -395,6 +602,10 @@ function correctiveActionStatusFrom(value: unknown): CorrectiveActionStatus {
   return "OUVERTE";
 }
 
+function photoModuleTypeFrom(value: unknown): PhotoModuleType {
+  return value === "correctiveAction" ? "correctiveAction" : "audit";
+}
+
 function compactData(data: Record<string, unknown>) {
   return Object.fromEntries(
     Object.entries(data).filter(([, value]) => value !== undefined),
@@ -449,4 +660,42 @@ async function readAppwriteError(response: Response) {
   }
 
   return `Appwrite a refuse la requete (${response.status})`;
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number,
+) {
+  console.log("[build-trace] fetchWithTimeout start", {
+    method: init.method ?? "GET",
+    input: String(input),
+    timeoutMs,
+  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+    console.log("[build-trace] fetchWithTimeout done", {
+      input: String(input),
+      status: response.status,
+    });
+    return response;
+  } catch (error) {
+    console.log("[build-trace] fetchWithTimeout error", {
+      input: String(input),
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Appwrite ne répond pas dans le délai attendu.");
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }

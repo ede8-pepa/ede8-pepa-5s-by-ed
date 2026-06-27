@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { PendingPhotoSelector, uploadPhotos } from "@/components/photo-tools";
 import type { Zone } from "@/lib/types";
 import { cx } from "@/lib/utils";
 
@@ -20,6 +21,7 @@ type SaveState = {
   message: string;
   scorePercent?: number;
   auditStatus?: string;
+  photoWarning?: string;
 };
 
 type AuditDraft = {
@@ -46,6 +48,7 @@ export function NewAuditForm({ zones }: { zones: Zone[] }) {
   const [comments, setComments] = useState<Record<string, string>>(
     Object.fromEntries(criteria.map((criterion) => [criterion, ""])),
   );
+  const [pendingPhotoFiles, setPendingPhotoFiles] = useState<File[]>([]);
 
   useEffect(() => {
     const shouldRestoreDraft = shouldRestoreAuditDraft();
@@ -132,7 +135,10 @@ export function NewAuditForm({ zones }: { zones: Zone[] }) {
           })),
         }),
       });
-      const payload = (await response.json()) as { message?: string };
+      const payload = (await response.json()) as {
+        auditId?: string;
+        message?: string;
+      };
 
       if (!response.ok) {
         throw new Error(
@@ -140,11 +146,36 @@ export function NewAuditForm({ zones }: { zones: Zone[] }) {
         );
       }
 
+      let photoWarning: string | undefined;
+
+      if (pendingPhotoFiles.length > 0) {
+        if (!payload.auditId) {
+          photoWarning =
+            "Audit enregistré, mais les photos n'ont pas pu être liées car l'identifiant audit est manquant.";
+        } else {
+          try {
+            await uploadPhotos({
+              files: pendingPhotoFiles,
+              moduleType: "audit",
+              entityId: payload.auditId,
+              zoneId: selectedZone.id,
+              uploadedBy: auditorName,
+            });
+          } catch (photoError) {
+            photoWarning =
+              photoError instanceof Error
+                ? `Audit enregistré, mais les photos n'ont pas été ajoutées : ${photoError.message}`
+                : "Audit enregistré, mais les photos n'ont pas été ajoutées.";
+          }
+        }
+      }
+
       setState({
         status: "success",
         message: "Audit enregistré avec succès",
         scorePercent: submittedScorePercent,
         auditStatus: submittedAuditStatus,
+        photoWarning,
       });
       clearAuditDraft();
       resetTimerRef.current = setTimeout(() => {
@@ -173,6 +204,7 @@ export function NewAuditForm({ zones }: { zones: Zone[] }) {
 
   function resetAfterSuccessfulAudit() {
     setSelectedZoneId("");
+    setPendingPhotoFiles([]);
     resetAuditGrid();
   }
 
@@ -180,6 +212,7 @@ export function NewAuditForm({ zones }: { zones: Zone[] }) {
     setSelectedZoneId("");
     setAuditorName("");
     setShift("");
+    setPendingPhotoFiles([]);
     resetAuditGrid();
   }
 
@@ -213,6 +246,9 @@ export function NewAuditForm({ zones }: { zones: Zone[] }) {
             <div className="mt-2 grid gap-1 text-sm">
               <p>Score : {state.scorePercent} %</p>
               <p>Statut : {state.auditStatus}</p>
+              {state.photoWarning ? (
+                <p className="mt-2 text-amber-700">{state.photoWarning}</p>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -351,6 +387,12 @@ export function NewAuditForm({ zones }: { zones: Zone[] }) {
           ))}
         </div>
       </div>
+
+      <PendingPhotoSelector
+        files={pendingPhotoFiles}
+        onFilesChange={setPendingPhotoFiles}
+        disabled={isPending}
+      />
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
         <button

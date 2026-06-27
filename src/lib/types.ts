@@ -109,6 +109,40 @@ export type CorrectiveAction = {
 
 export type CorrectiveActionStatus = "OUVERTE" | "EN_COURS" | "CLOTUREE";
 
+export type PhotoModuleType = "audit" | "correctiveAction";
+
+export type PhotoMetadata = {
+  $id: string;
+  id: string;
+  fileId: string;
+  moduleType: PhotoModuleType;
+  entityId: string;
+  companyId?: string;
+  siteId?: string;
+  zoneId?: string;
+  uploadedBy?: string;
+  createdAt?: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  storagePath?: string;
+  deletedAt?: string;
+};
+
+export type CreatePhotoMetadataInput = {
+  fileId: string;
+  moduleType: PhotoModuleType;
+  entityId: string;
+  companyId?: string;
+  siteId?: string;
+  zoneId?: string;
+  uploadedBy?: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  storagePath?: string;
+};
+
 export type Standard = {
   $id: string;
   id: string;
@@ -135,6 +169,7 @@ export type AppwriteTablesData = {
   audits: Audit[];
   auditAnswers: AuditAnswer[];
   correctiveActions: CorrectiveAction[];
+  photos: PhotoMetadata[];
 };
 
 export type CreateAuditInput = {

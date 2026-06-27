@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { CorrectiveActionStatusActions } from "@/components/corrective-action-status-actions";
 import { PageHeader } from "@/components/page-header";
+import { PhotoManager } from "@/components/photo-tools";
 import {
   type CorrectiveActionNavigation,
   getCorrectiveActionNavigation,
@@ -12,8 +13,11 @@ import {
   readAppwriteAudit,
   readAppwriteCorrectiveAction,
   readAppwriteCorrectiveActions,
+  readAppwritePhotos,
 } from "@/lib/data/appwrite-service";
-import type { Audit, CorrectiveAction } from "@/lib/types";
+import type { Audit, CorrectiveAction, PhotoMetadata } from "@/lib/types";
+
+console.log("[build-trace] src/app/actions/[id]/page.tsx module loaded");
 
 export const dynamic = "force-dynamic";
 
@@ -22,8 +26,16 @@ export default async function CorrectiveActionDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  console.log("[build-trace] CorrectiveActionDetailPage start");
   const { id } = await params;
-  const { action, audit, navigation } = await getCorrectiveActionDetail(id);
+  const { action, audit, navigation, photos } =
+    await getCorrectiveActionDetail(id);
+  console.log("[build-trace] CorrectiveActionDetailPage data loaded", {
+    id,
+    found: Boolean(action),
+    hasAudit: Boolean(audit),
+    photos: photos.length,
+  });
 
   if (!action) {
     return (
@@ -52,46 +64,60 @@ export default async function CorrectiveActionDetailPage({
       <ActionNavigation navigation={navigation} />
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <article className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex flex-wrap items-center gap-3">
-            <span
-              className={`rounded-full px-3 py-2 text-xs font-black ring-1 ${status.className}`}
-            >
-              {status.label}
-            </span>
-            <span
-              className={`rounded-full px-3 py-2 text-xs font-black ring-1 ${dueState.className}`}
-            >
-              {dueState.label}
-            </span>
-          </div>
-
-          <dl className="mt-6 grid gap-5 sm:grid-cols-2">
-            <DetailItem label="Responsable" value={action.responsable} />
-            <DetailItem label="Échéance">
-              <span className="grid gap-1">
-                <span>{formatDate(action.dueDate)}</span>
-                <span className="text-sm text-slate-500">{dueState.label}</span>
-              </span>
-            </DetailItem>
-            <DetailItem label="Audit associé">
-              <Link
-                href={`/historique/${action.auditId}`}
-                className="font-black text-[#0f4c81] hover:underline"
+        <div className="min-w-0">
+          <article className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <span
+                className={`rounded-full px-3 py-2 text-xs font-black ring-1 ${status.className}`}
               >
-                {audit ? audit.zoneName : action.auditId}
-              </Link>
-            </DetailItem>
-            <DetailItem label="Statut" value={action.status} />
-          </dl>
+                {status.label}
+              </span>
+              <span
+                className={`rounded-full px-3 py-2 text-xs font-black ring-1 ${dueState.className}`}
+              >
+                {dueState.label}
+              </span>
+            </div>
 
-          <div className="mt-6 border-t border-slate-200 pt-5">
-            <h2 className="text-sm font-black text-slate-500">Description</h2>
-            <p className="mt-2 leading-7 text-slate-700">
-              {action.description || "Aucune description renseignée."}
-            </p>
-          </div>
-        </article>
+            <dl className="mt-6 grid gap-5 sm:grid-cols-2">
+              <DetailItem label="Responsable" value={action.responsable} />
+              <DetailItem label="Échéance">
+                <span className="grid gap-1">
+                  <span>{formatDate(action.dueDate)}</span>
+                  <span className="text-sm text-slate-500">
+                    {dueState.label}
+                  </span>
+                </span>
+              </DetailItem>
+              <DetailItem label="Audit associé">
+                <Link
+                  href={`/historique/${action.auditId}`}
+                  className="font-black text-[#0f4c81] hover:underline"
+                >
+                  {audit ? audit.zoneName : action.auditId}
+                </Link>
+              </DetailItem>
+              <DetailItem label="Statut" value={action.status} />
+            </dl>
+
+            <div className="mt-6 border-t border-slate-200 pt-5">
+              <h2 className="text-sm font-black text-slate-500">
+                Description
+              </h2>
+              <p className="mt-2 leading-7 text-slate-700">
+                {action.description || "Aucune description renseignée."}
+              </p>
+            </div>
+          </article>
+
+          <PhotoManager
+            moduleType="correctiveAction"
+            entityId={action.$id}
+            initialPhotos={photos}
+            title="Photos de l'action"
+            emptyLabel="Aucune photo enregistrée pour cette action."
+          />
+        </div>
 
         <aside className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="text-lg font-black text-slate-950">Avancement</h2>
@@ -190,6 +216,7 @@ async function getCorrectiveActionDetail(actionId: string): Promise<{
   action: CorrectiveAction | undefined;
   audit: Audit | undefined;
   navigation: CorrectiveActionNavigation<CorrectiveAction>;
+  photos: PhotoMetadata[];
 }> {
   try {
     const [action, actions] = await Promise.all([
@@ -197,6 +224,7 @@ async function getCorrectiveActionDetail(actionId: string): Promise<{
       readAppwriteCorrectiveActions(),
     ]);
     let audit: Audit | undefined;
+    let photos: PhotoMetadata[] = [];
 
     try {
       audit = await readAppwriteAudit(action.auditId);
@@ -204,10 +232,17 @@ async function getCorrectiveActionDetail(actionId: string): Promise<{
       audit = undefined;
     }
 
+    try {
+      photos = await readAppwritePhotos("correctiveAction", action.$id);
+    } catch {
+      photos = [];
+    }
+
     return {
       action,
       audit,
       navigation: getCorrectiveActionNavigation(actions, actionId),
+      photos,
     };
   } catch {
     return {
@@ -217,6 +252,7 @@ async function getCorrectiveActionDetail(actionId: string): Promise<{
         previousAction: undefined,
         nextAction: undefined,
       },
+      photos: [],
     };
   }
 }

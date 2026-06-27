@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/page-header";
 import { getStandardDetail } from "@/lib/data/standards-provider";
 import type { Standard } from "@/lib/types";
 
+console.log("[build-trace] src/app/standards/[zoneId]/page.tsx module loaded");
+
 export const dynamic = "force-dynamic";
 
 export default async function StandardDetailPage({
@@ -13,9 +15,14 @@ export default async function StandardDetailPage({
   params: Promise<{ zoneId: string }>;
   searchParams?: Promise<{ returnTo?: string }>;
 }) {
+  console.log("[build-trace] StandardDetailPage start");
   const { zoneId } = await params;
   const resolvedSearchParams = await searchParams;
   const { zone, standards } = await getStandardDetail(zoneId);
+  console.log("[build-trace] StandardDetailPage data loaded", {
+    zoneId,
+    standards: standards.length,
+  });
   const title = zone?.name ?? standards[0]?.title ?? "Zone inconnue";
   const returnToAudit = resolvedSearchParams?.returnTo === "/nouvel-audit";
 

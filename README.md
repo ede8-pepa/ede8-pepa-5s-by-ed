@@ -8,6 +8,7 @@ Modules bêta validés :
 - Historique et détail audit
 - Actions correctives
 - Standards 5S
+- Photos audits et actions correctives
 - Responsive mobile
 
 ## Développement Local
@@ -58,12 +59,60 @@ Créer les variables suivantes dans Vercel :
 APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
 APPWRITE_PROJECT_ID=6a3681b00024f77f43af
 APPWRITE_DATABASE_ID=6a3683a20012ce76d15f
+APPWRITE_PHOTOS_BUCKET_ID=photos
+APPWRITE_PHOTOS_COLLECTION_ID=photos
 APPWRITE_API_KEY=
 ```
 
 `APPWRITE_API_KEY` est optionnelle selon les permissions Appwrite bêta. Si elle est utilisée, elle doit rester côté serveur uniquement. Ne pas créer de variable `NEXT_PUBLIC_APPWRITE_API_KEY`.
 
 Le fichier [.env.example](./.env.example) sert de modèle sans clé secrète.
+
+## Appwrite : Photos
+
+Le module photos utilise Appwrite Storage et une collection de métadonnées.
+
+Bucket Storage attendu :
+
+```text
+photos
+```
+
+Ou l'identifiant défini dans `APPWRITE_PHOTOS_BUCKET_ID`.
+
+Collection Database attendue :
+
+```text
+photos
+```
+
+Ou l'identifiant défini dans `APPWRITE_PHOTOS_COLLECTION_ID`.
+
+Attributs recommandés pour la collection `photos` :
+
+```text
+file_id       string required
+module_type   string required   audit | correctiveAction
+entity_id     string required
+company_id    string optional
+site_id       string optional
+zone_id       string optional
+uploaded_by   string optional
+file_name     string required
+file_size     integer required
+mime_type     string required
+storage_path  string optional
+```
+
+L'application utilise `$id`, `$createdAt` et `$updatedAt` fournis par Appwrite. Elle n'exige pas de colonne spécifique client : `company_id` et `site_id` restent optionnels pour les futurs déploiements multi-entreprises et multi-sites.
+
+Organisation logique prévue pour les fichiers :
+
+```text
+company/site/module/year/zone/entity/file
+```
+
+Cette organisation est stockée en métadonnée (`storage_path`) afin de rester compatible avec un volume important de photos sans imposer de logique propre à un site pilote.
 
 ## Déploiement Vercel
 
@@ -102,7 +151,7 @@ Ou le domaine réel généré par Vercel si différent.
 
 Mode bêta : les permissions Appwrite peuvent rester ouvertes temporairement pour les tests terrain.
 
-Authentification, rôles, durcissement des permissions, photos et exports PDF seront traités dans des sprints ultérieurs.
+Authentification, rôles, durcissement des permissions et exports PDF seront traités dans des sprints ultérieurs.
 
 Ne jamais commiter :
 - `.env`

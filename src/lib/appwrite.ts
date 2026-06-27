@@ -18,14 +18,21 @@ export const appwriteConfig = {
     auditAnswers: "audit_answers",
     correctiveActions: "corrective_actions",
     standards: "standards",
+    photos: process.env.APPWRITE_PHOTOS_COLLECTION_ID ?? "photos",
+  },
+  storage: {
+    photosBucketId: process.env.APPWRITE_PHOTOS_BUCKET_ID ?? "photos",
   },
 } as const;
 
-export function createAppwriteHeaders() {
+export function createAppwriteHeaders(contentType = "application/json") {
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     "X-Appwrite-Project": appwriteConfig.projectId,
   };
+
+  if (contentType) {
+    headers["Content-Type"] = contentType;
+  }
 
   if (appwriteConfig.apiKey) {
     headers["X-Appwrite-Key"] = appwriteConfig.apiKey;
@@ -48,15 +55,39 @@ export function createDocumentUrl(collectionId: string, documentId: string) {
 
 export function createCollectionUrlWithParams(
   collectionId: string,
-  params: Record<string, string>,
+  params: Record<string, string | string[]>,
 ) {
   const url = new URL(createCollectionUrl(collectionId));
 
   Object.entries(params).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      value.forEach((item) => url.searchParams.append(key, item));
+      return;
+    }
+
     url.searchParams.set(key, value);
   });
 
   return url.toString();
+}
+
+export function createStorageFileUrl(fileId: string) {
+  return `${createStorageFilesUrl()}/${encodeURIComponent(fileId)}`;
+}
+
+export function createStorageFilesUrl() {
+  const endpoint = appwriteConfig.endpoint.replace(/\/$/, "");
+  const bucketId = encodeURIComponent(appwriteConfig.storage.photosBucketId);
+
+  return `${endpoint}/storage/buckets/${bucketId}/files`;
+}
+
+export function createStorageFilePreviewUrl(fileId: string) {
+  return `${createStorageFileUrl(fileId)}/preview`;
+}
+
+export function createStorageFileViewUrl(fileId: string) {
+  return `${createStorageFileUrl(fileId)}/view`;
 }
 
 export async function createAppwriteSdkConnection() {

@@ -10,6 +10,8 @@ import {
 import { readAppwriteCorrectiveActions } from "@/lib/data/appwrite-service";
 import type { CorrectiveAction, CorrectiveActionStatus } from "@/lib/types";
 
+console.log("[build-trace] src/app/actions/page.tsx module loaded");
+
 export const dynamic = "force-dynamic";
 
 type CorrectiveActionFilter = CorrectiveActionStatus | "RETARD";
@@ -19,9 +21,11 @@ export default async function CorrectiveActionsPage({
 }: {
   searchParams?: Promise<{ status?: string }>;
 }) {
+  console.log("[build-trace] CorrectiveActionsPage start");
   const resolvedSearchParams = await searchParams;
   const selectedFilter = normalizeFilter(resolvedSearchParams?.status);
   const actions = await getCorrectiveActions(selectedFilter);
+  console.log("[build-trace] CorrectiveActionsPage actions loaded", actions.length);
 
   return (
     <AppShell activePath="/actions">

@@ -3,10 +3,14 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { getStandardsOverview } from "@/lib/data/standards-provider";
 
+console.log("[build-trace] src/app/standards/page.tsx module loaded");
+
 export const dynamic = "force-dynamic";
 
 export default async function StandardsPage() {
+  console.log("[build-trace] StandardsPage start");
   const zones = await getStandardsOverview();
+  console.log("[build-trace] StandardsPage zones loaded", zones.length);
   const standardsCount = zones.reduce(
     (total, zone) => total + zone.standards.length,
     0,
