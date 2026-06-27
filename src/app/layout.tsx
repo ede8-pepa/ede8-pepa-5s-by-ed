@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-console.log("[build-trace] src/app/layout.tsx module loaded");
-
 export const metadata: Metadata = {
   title: "5S by ED",
   description: "Application de pilotage des audits 5S industriels",
@@ -13,7 +11,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  console.log("[build-trace] RootLayout render");
 
   return (
     <html lang="fr">

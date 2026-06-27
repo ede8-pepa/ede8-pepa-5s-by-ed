@@ -34,26 +34,20 @@ type ReadResult<T> = {
   hasDocuments: boolean;
 };
 
-console.log("[build-trace] appwrite-service module loaded");
-
 const APPWRITE_READ_FETCH_TIMEOUT_MS = 3000;
 const APPWRITE_WRITE_FETCH_TIMEOUT_MS = 30000;
 const APPWRITE_STORAGE_FETCH_TIMEOUT_MS = 60000;
 
 export async function readAppwriteZones(): Promise<Zone[]> {
-  console.log("[build-trace] readAppwriteZones start");
   const zones = await readCollection(appwriteConfig.collections.zones, mapZone);
-  console.log("[build-trace] readAppwriteZones done", zones.documents.length);
   return zones.documents;
 }
 
 export async function readAppwriteAudits(): Promise<Audit[]> {
-  console.log("[build-trace] readAppwriteAudits start");
   const audits = await readCollection(
     appwriteConfig.collections.audits,
     mapAudit,
   );
-  console.log("[build-trace] readAppwriteAudits done", audits.documents.length);
   return audits.documents;
 }
 
@@ -114,16 +108,11 @@ export async function createAuditAnswers(
 export async function readAppwriteCorrectiveActions(): Promise<
   CorrectiveAction[]
 > {
-  console.log("[build-trace] readAppwriteCorrectiveActions start");
   const actions = await readCollection(
     appwriteConfig.collections.correctiveActions,
     mapCorrectiveAction,
     undefined,
     "no-store",
-  );
-  console.log(
-    "[build-trace] readAppwriteCorrectiveActions done",
-    actions.documents.length,
   );
   return actions.documents;
 }
@@ -159,12 +148,10 @@ export async function createCorrectiveAction(
 }
 
 export async function readAppwriteStandards(): Promise<Standard[]> {
-  console.log("[build-trace] readAppwriteStandards start");
   const standards = await readCollection(
     appwriteConfig.collections.standards,
     mapStandard,
   );
-  console.log("[build-trace] readAppwriteStandards done", standards.documents.length);
   return standards.documents;
 }
 
@@ -199,24 +186,38 @@ export async function readAppwritePhotos(
   moduleType: PhotoModuleType,
   entityId: string,
 ): Promise<PhotoMetadata[]> {
-  console.log("[build-trace] readAppwritePhotos start", {
-    moduleType,
-    entityId,
-  });
-  const photos = await readCollection(
-    appwriteConfig.collections.photos,
-    mapPhotoMetadata,
-    {
-      "queries[]": [
-        createEqualQuery("module_type", moduleType),
-        createEqualQuery("entity_id", entityId),
-      ],
-    },
-    "no-store",
-  );
+  try {
+    const photos = await readCollection(
+      appwriteConfig.collections.photos,
+      mapPhotoMetadata,
+      {
+        "queries[]": [
+          createEqualQuery("module_type", moduleType),
+          createEqualQuery("entity_id", entityId),
+        ],
+      },
+      "no-store",
+    );
 
-  console.log("[build-trace] readAppwritePhotos done", photos.documents.length);
-  return photos.documents.filter((photo) => !photo.deletedAt);
+    return filterPhotosByContext(photos.documents, moduleType, entityId);
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[photos] Appwrite filtered read failed", {
+        moduleType,
+        entityId,
+        error: error instanceof Error ? error.message : "unknown",
+      });
+    }
+
+    const photos = await readCollection(
+      appwriteConfig.collections.photos,
+      mapPhotoMetadata,
+      undefined,
+      "no-store",
+    );
+
+    return filterPhotosByContext(photos.documents, moduleType, entityId);
+  }
 }
 
 export async function readAppwritePhoto(photoId: string): Promise<PhotoMetadata> {
@@ -558,11 +559,24 @@ function stringFrom(value: unknown) {
 }
 
 function createEqualQuery(attribute: string, value: string) {
-  return JSON.stringify({
-    method: "equal",
-    attribute,
-    values: [value],
-  });
+  return `equal("${escapeQueryString(attribute)}", ["${escapeQueryString(value)}"])`;
+}
+
+function escapeQueryString(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function filterPhotosByContext(
+  photos: PhotoMetadata[],
+  moduleType: PhotoModuleType,
+  entityId: string,
+) {
+  return photos.filter(
+    (photo) =>
+      !photo.deletedAt &&
+      photo.moduleType === moduleType &&
+      photo.entityId === entityId,
+  );
 }
 
 function optionalString(value: unknown) {
@@ -667,11 +681,6 @@ async function fetchWithTimeout(
   init: RequestInit,
   timeoutMs: number,
 ) {
-  console.log("[build-trace] fetchWithTimeout start", {
-    method: init.method ?? "GET",
-    input: String(input),
-    timeoutMs,
-  });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -680,16 +689,8 @@ async function fetchWithTimeout(
       ...init,
       signal: controller.signal,
     });
-    console.log("[build-trace] fetchWithTimeout done", {
-      input: String(input),
-      status: response.status,
-    });
     return response;
   } catch (error) {
-    console.log("[build-trace] fetchWithTimeout error", {
-      input: String(input),
-      error: error instanceof Error ? error.message : "unknown",
-    });
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error("Appwrite ne répond pas dans le délai attendu.");
     }

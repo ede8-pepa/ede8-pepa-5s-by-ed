@@ -218,6 +218,52 @@ export function PhotoManager({
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (initialPhotos.length > 0) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function loadPhotos() {
+      try {
+        const params = new URLSearchParams({
+          moduleType,
+          entityId,
+        });
+        const response = await fetch(`/api/photos?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as {
+          photos?: PhotoMetadata[];
+          message?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(payload.message ?? "Impossible de charger les photos.");
+        }
+
+        setPhotos(payload.photos ?? []);
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
+
+        setMessage({
+          status: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Impossible de charger les photos.",
+        });
+      }
+    }
+
+    void loadPhotos();
+
+    return () => controller.abort();
+  }, [entityId, initialPhotos.length, moduleType]);
+
   async function handleUpload(fileList: FileList | null) {
     const result = validateFiles(Array.from(fileList ?? []));
 

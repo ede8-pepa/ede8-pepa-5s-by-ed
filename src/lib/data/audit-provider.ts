@@ -20,11 +20,8 @@ import type {
 
 const APPWRITE_READ_TIMEOUT_MS = 3000;
 
-console.log("[build-trace] audit-provider module loaded");
-
 export const auditProvider: AuditProvider = {
   async getDashboardData() {
-    console.log("[build-trace] auditProvider.getDashboardData start");
     try {
       const [appwriteZones, appwriteAudits, correctiveActions] =
         await withTimeout(
@@ -35,9 +32,7 @@ export const auditProvider: AuditProvider = {
           ]),
         APPWRITE_READ_TIMEOUT_MS,
       );
-      console.log("[build-trace] auditProvider.getDashboardData appwrite read done");
       const auditAnswers = await readDashboardAuditAnswers(appwriteAudits);
-      console.log("[build-trace] auditProvider.getDashboardData answers done");
 
       if (appwriteZones.length === 0) {
         const insights = buildDashboardInsights(
@@ -70,7 +65,6 @@ export const auditProvider: AuditProvider = {
         auditAnswers,
       );
     } catch {
-      console.log("[build-trace] auditProvider.getDashboardData fallback");
       const insights = buildDashboardInsights(mockAudits, getMockAuditAnswers());
 
       return {
@@ -92,16 +86,13 @@ export const auditProvider: AuditProvider = {
     }
   },
   async getZones() {
-    console.log("[build-trace] auditProvider.getZones start");
     try {
       const appwriteZones = await withTimeout(
         readAppwriteZones(),
         APPWRITE_READ_TIMEOUT_MS,
       );
-      console.log("[build-trace] auditProvider.getZones appwrite read done");
       return appwriteZones.length > 0 ? appwriteZones : zones;
     } catch {
-      console.log("[build-trace] auditProvider.getZones fallback");
       return zones;
     }
   },

@@ -4,8 +4,6 @@ import { PageHeader } from "@/components/page-header";
 import { getAuditScoreStatus } from "@/lib/audit-status";
 import { getAuditHistoryWithAnswers } from "@/lib/data/audit-history-provider";
 
-console.log("[build-trace] src/app/historique/page.tsx module loaded");
-
 export const dynamic = "force-dynamic";
 
 type AuditHistoryFilters = {
@@ -23,11 +21,9 @@ export default async function AuditHistoryPage({
     zone?: string;
   }>;
 }) {
-  console.log("[build-trace] AuditHistoryPage start");
   const resolvedSearchParams = await searchParams;
   const filters = normalizeFilters(resolvedSearchParams);
   const audits = filterAudits(await getAuditHistoryWithAnswers(), filters);
-  console.log("[build-trace] AuditHistoryPage audits loaded", audits.length);
 
   return (
     <AppShell activePath="/historique">

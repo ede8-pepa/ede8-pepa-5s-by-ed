@@ -6,8 +6,6 @@ import {
 } from "@/lib/data/appwrite-service";
 import type { PhotoMetadata, PhotoModuleType } from "@/lib/types";
 
-console.log("[build-trace] src/app/api/photos/route.ts module loaded");
-
 const maxPhotoSizeBytes = 10 * 1024 * 1024;
 const supportedMimeTypes = new Set([
   "image/jpeg",
@@ -18,15 +16,26 @@ const supportedMimeTypes = new Set([
 ]);
 
 export async function GET(request: Request) {
-  console.log("[build-trace] photos API GET start");
   try {
     const url = new URL(request.url);
     const moduleType = requiredModuleType(url.searchParams.get("moduleType"));
     const entityId = requiredString(url.searchParams.get("entityId"), "entityId");
     const photos = await readAppwritePhotos(moduleType, entityId);
 
+    if (process.env.NODE_ENV === "development") {
+      console.log("[photos:get]", {
+        moduleType,
+        entityId,
+        count: photos.length,
+      });
+    }
+
     return NextResponse.json({ photos });
   } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("[photos:get:error]", error);
+    }
+
     return NextResponse.json(
       {
         message:
@@ -40,7 +49,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  console.log("[build-trace] photos API POST start");
   try {
     const formData = await request.formData();
     const moduleType = requiredModuleType(formData.get("moduleType"));

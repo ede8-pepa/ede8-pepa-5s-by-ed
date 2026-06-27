@@ -17,8 +17,6 @@ import {
 } from "@/lib/data/appwrite-service";
 import type { Audit, CorrectiveAction, PhotoMetadata } from "@/lib/types";
 
-console.log("[build-trace] src/app/actions/[id]/page.tsx module loaded");
-
 export const dynamic = "force-dynamic";
 
 export default async function CorrectiveActionDetailPage({
@@ -26,16 +24,9 @@ export default async function CorrectiveActionDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  console.log("[build-trace] CorrectiveActionDetailPage start");
   const { id } = await params;
   const { action, audit, navigation, photos } =
     await getCorrectiveActionDetail(id);
-  console.log("[build-trace] CorrectiveActionDetailPage data loaded", {
-    id,
-    found: Boolean(action),
-    hasAudit: Boolean(audit),
-    photos: photos.length,
-  });
 
   if (!action) {
     return (

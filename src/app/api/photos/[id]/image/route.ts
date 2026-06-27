@@ -3,13 +3,10 @@ import {
   readPhotoFileResponse,
 } from "@/lib/data/appwrite-service";
 
-console.log("[build-trace] src/app/api/photos/[id]/image/route.ts module loaded");
-
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  console.log("[build-trace] photos API image GET start");
   try {
     const { id } = await params;
     const url = new URL(request.url);

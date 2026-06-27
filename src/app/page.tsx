@@ -8,14 +8,10 @@ import { ZoneList } from "@/components/zone-list";
 import { auditProvider } from "@/lib/data/audit-provider";
 import type { DashboardData } from "@/lib/types";
 
-console.log("[build-trace] src/app/page.tsx module loaded");
-
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  console.log("[build-trace] DashboardPage start");
   const data = await auditProvider.getDashboardData();
-  console.log("[build-trace] DashboardPage data loaded");
   const orderedKpis = orderDashboardKpis(data.kpis);
 
   return (

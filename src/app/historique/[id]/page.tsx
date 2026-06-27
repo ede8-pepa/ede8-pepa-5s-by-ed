@@ -15,8 +15,6 @@ import {
 import { readAppwritePhotos } from "@/lib/data/appwrite-service";
 import type { PhotoMetadata } from "@/lib/types";
 
-console.log("[build-trace] src/app/historique/[id]/page.tsx module loaded");
-
 export const dynamic = "force-dynamic";
 
 export default async function AuditDetailPage({
@@ -24,19 +22,12 @@ export default async function AuditDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  console.log("[build-trace] AuditDetailPage start");
   const { id } = await params;
   const { audit, answers } = await getAuditDetail(id);
   const navigation = await getAuditNavigation(id);
   const status = audit ? getAuditScoreStatus(audit.scorePercent) : undefined;
   const findingCounts = countAuditFindings(answers);
   const photos = audit ? await readPhotosSafely("audit", audit.$id) : [];
-  console.log("[build-trace] AuditDetailPage data loaded", {
-    id,
-    found: Boolean(audit),
-    answers: answers.length,
-    photos: photos.length,
-  });
 
   if (!audit) {
     return (

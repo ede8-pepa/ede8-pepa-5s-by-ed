@@ -4,14 +4,10 @@ import { NewAuditForm } from "@/components/new-audit-form";
 import { PageHeader } from "@/components/page-header";
 import { auditProvider } from "@/lib/data/audit-provider";
 
-console.log("[build-trace] src/app/nouvel-audit/page.tsx module loaded");
-
 export const dynamic = "force-dynamic";
 
 export default async function NewAuditPage() {
-  console.log("[build-trace] NewAuditPage start");
   const zones = await auditProvider.getZones();
-  console.log("[build-trace] NewAuditPage zones loaded", zones.length);
 
   return (
     <AppShell activePath="/nouvel-audit">
