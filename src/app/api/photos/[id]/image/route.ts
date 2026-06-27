@@ -13,7 +13,17 @@ export async function GET(
     const variant =
       url.searchParams.get("variant") === "full" ? "full" : "thumb";
     const photo = await readAppwritePhoto(id);
-    const response = await readPhotoFileResponse(photo.fileId, variant);
+    let response: Response;
+
+    try {
+      response = await readPhotoFileResponse(photo.fileId, variant);
+    } catch (error) {
+      if (variant !== "thumb") {
+        throw error;
+      }
+
+      response = await readPhotoFileResponse(photo.fileId, "full");
+    }
 
     return new Response(response.body, {
       status: response.status,

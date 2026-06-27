@@ -395,15 +395,11 @@ export function PhotoManager({
               key={photo.$id}
               type="button"
               onClick={() => setSelectedPhoto(photo)}
-              className="group min-h-11 min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-left transition hover:border-blue-200 hover:shadow-sm"
+              className="group min-h-11 min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white text-left shadow-sm transition hover:border-blue-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#0f4c81] focus:ring-offset-2"
+              aria-label={`Voir la photo ${photo.fileName}`}
             >
-              <img
-                src={`/api/photos/${photo.$id}/image?variant=thumb`}
-                alt={photo.fileName}
-                loading="lazy"
-                className="aspect-square w-full object-cover"
-              />
-              <span className="block truncate px-2 py-2 text-xs font-black text-slate-700 group-hover:text-[#0f4c81]">
+              <PhotoThumbnail photo={photo} />
+              <span className="block truncate border-t border-slate-100 px-2 py-2 text-[11px] font-bold text-slate-500 group-hover:text-[#0f4c81]">
                 {photo.fileName}
               </span>
             </button>
@@ -425,6 +421,28 @@ export function PhotoManager({
         />
       ) : null}
     </section>
+  );
+}
+
+function PhotoThumbnail({ photo }: { photo: PhotoMetadata }) {
+  const [hasError, setHasError] = useState(false);
+
+  return (
+    <span className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-100">
+      {!hasError ? (
+        <img
+          src={`/api/photos/${photo.$id}/image?variant=thumb`}
+          alt={photo.fileName}
+          loading="lazy"
+          className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]"
+          onError={() => setHasError(true)}
+        />
+      ) : (
+        <span className="flex h-full w-full items-center justify-center px-3 text-center text-xs font-black text-slate-500">
+          Aperçu indisponible
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -472,10 +490,12 @@ function PhotoLightbox({
   onClose: () => void;
   onDelete: () => void;
 }) {
+  const [hasError, setHasError] = useState(false);
+
   return (
-    <div className="fixed inset-0 z-50 grid bg-slate-950/90 p-3 sm:p-6">
-      <div className="flex min-h-0 flex-col rounded-lg bg-white shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-3 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-2 sm:p-6">
+      <div className="flex h-[calc(100dvh-1rem)] w-full max-w-6xl min-w-0 flex-col overflow-hidden rounded-lg bg-white shadow-xl sm:h-[calc(100dvh-3rem)]">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-3 sm:p-4">
           <div className="min-w-0">
             <p className="truncate text-sm font-black text-slate-950">
               {photo.fileName}
@@ -484,7 +504,7 @@ function PhotoLightbox({
               {formatFileSize(photo.fileSize)}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex shrink-0 gap-2">
             {allowDelete ? (
               <button
                 type="button"
@@ -504,12 +524,19 @@ function PhotoLightbox({
             </button>
           </div>
         </div>
-        <div className="grid min-h-0 flex-1 place-items-center bg-slate-100 p-2 sm:p-4">
-          <img
-            src={`/api/photos/${photo.$id}/image?variant=full`}
-            alt={photo.fileName}
-            className="max-h-full max-w-full rounded-lg object-contain"
-          />
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-slate-100 p-2 sm:p-4">
+          {!hasError ? (
+            <img
+              src={`/api/photos/${photo.$id}/image?variant=full`}
+              alt={photo.fileName}
+              className="h-full max-h-full w-full max-w-full rounded-lg object-contain"
+              onError={() => setHasError(true)}
+            />
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-5 text-center text-sm font-black text-slate-600">
+              Image indisponible.
+            </div>
+          )}
         </div>
       </div>
     </div>
