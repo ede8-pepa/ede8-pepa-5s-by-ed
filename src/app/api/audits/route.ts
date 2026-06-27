@@ -18,8 +18,10 @@ type AuditRequestBody = {
 };
 
 export async function POST(request: Request) {
+  console.log("[audit-debug][api] POST /api/audits start");
   try {
     const body = (await request.json()) as AuditRequestBody;
+    console.log("[audit-debug][api] body recu", body);
     const zoneId = requiredString(body.zoneId, "zone");
     const zoneName = requiredString(body.zoneName, "zone");
     const auditorName = requiredString(body.auditorName, "auditeur");
@@ -28,6 +30,15 @@ export async function POST(request: Request) {
     const scorePercent = calculateScorePercent(answers);
     const status = scorePercent >= 80 ? "conforme" : "a_surveiller";
 
+    console.log("[audit-debug][api] 3. appel createAudit()", {
+      zoneId,
+      zoneName,
+      auditorName,
+      shift,
+      scorePercent,
+      status,
+      answersCount: answers.length,
+    });
     const audit = await createAudit({
       zoneId,
       zoneName,
@@ -36,13 +47,31 @@ export async function POST(request: Request) {
       scorePercent,
       status,
     });
+    console.log("[audit-debug][api] 5. createAudit retourne", {
+      auditId: audit.$id,
+      audit,
+    });
 
+    if (!audit.$id) {
+      throw new Error(
+        "Appwrite n'a pas retourné d'identifiant après création de l'audit.",
+      );
+    }
+
+    console.log("[audit-debug][api] appel createAuditAnswers()", {
+      auditId: audit.$id,
+      answersCount: answers.length,
+    });
     const createdAnswers = await createAuditAnswers(
       answers.map((answer) => ({
         ...answer,
         auditId: audit.$id,
       })),
     );
+    console.log("[audit-debug][api] createAuditAnswers retourne", {
+      auditId: audit.$id,
+      createdAnswersCount: createdAnswers.length,
+    });
 
     if (createdAnswers.length !== answers.length) {
       throw new Error(
@@ -50,6 +79,10 @@ export async function POST(request: Request) {
       );
     }
 
+    console.log("[audit-debug][api] 7. retour api success", {
+      auditId: audit.$id,
+      answersCount: createdAnswers.length,
+    });
     return NextResponse.json({
       auditId: audit.$id,
       answersCount: createdAnswers.length,
@@ -57,6 +90,7 @@ export async function POST(request: Request) {
       scorePercent,
     });
   } catch (error) {
+    console.error("[audit-debug][api] 6. catch api", error);
     return NextResponse.json(
       {
         message:

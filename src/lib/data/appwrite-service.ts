@@ -75,6 +75,11 @@ export async function readAppwriteAllAuditAnswers(): Promise<AuditAnswer[]> {
 }
 
 export async function createAudit(input: CreateAuditInput): Promise<Audit> {
+  console.log("[audit-debug][service] 3. createAudit() start", {
+    databaseId: appwriteConfig.databaseId,
+    collectionId: appwriteConfig.collections.audits,
+    input,
+  });
   const document = await createDocument(appwriteConfig.collections.audits, {
     zone_id: input.zoneId,
     zone_name: input.zoneName,
@@ -83,8 +88,18 @@ export async function createAudit(input: CreateAuditInput): Promise<Audit> {
     score_percent: input.scorePercent,
     status: input.status,
   });
+  console.log("[audit-debug][service] 4. reponse Appwrite audit", document);
 
-  return mapAudit(document);
+  if (!document.$id) {
+    throw new Error(
+      "Réponse Appwrite invalide : aucun $id retourné pour l'audit créé.",
+    );
+  }
+
+  const audit = mapAudit(document);
+  console.log("[audit-debug][service] 5. ID retourne", { auditId: audit.$id });
+
+  return audit;
 }
 
 export async function createAuditAnswers(
@@ -376,6 +391,10 @@ async function createDocument(
   collectionId: string,
   data: Record<string, unknown>,
 ): Promise<AppwriteDocument> {
+  console.log("[audit-debug][service] createDocument request", {
+    collectionId,
+    data,
+  });
   const response = await fetchWithTimeout(
     createCollectionUrl(collectionId),
     {
@@ -388,13 +407,29 @@ async function createDocument(
     },
     APPWRITE_WRITE_FETCH_TIMEOUT_MS,
   );
+  console.log("[audit-debug][service] createDocument response status", {
+    collectionId,
+    ok: response.ok,
+    status: response.status,
+  });
 
   if (!response.ok) {
     const message = await readAppwriteError(response);
+    console.error("[audit-debug][service] createDocument error", {
+      collectionId,
+      message,
+    });
     throw new Error(message);
   }
 
-  return (await response.json()) as AppwriteDocument;
+  const payload = (await response.json()) as AppwriteDocument;
+  console.log("[audit-debug][service] createDocument payload", {
+    collectionId,
+    id: payload.$id,
+    payload,
+  });
+
+  return payload;
 }
 
 async function updateDocument(

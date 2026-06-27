@@ -90,8 +90,10 @@ export function NewAuditForm({ zones }: { zones: Zone[] }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    console.log("[audit-debug][ui] 1. debut submit");
 
     if (!selectedZone) {
+      console.log("[audit-debug][ui] stop: zone manquante");
       setState({
         status: "error",
         message: "Sélectionnez une zone avant d'enregistrer l'audit.",
@@ -100,6 +102,7 @@ export function NewAuditForm({ zones }: { zones: Zone[] }) {
     }
 
     if (shift !== "Matin" && shift !== "Soir") {
+      console.log("[audit-debug][ui] stop: poste manquant", { shift });
       setState({
         status: "error",
         message: "Sélectionnez un poste avant d'enregistrer l'audit.",
@@ -118,27 +121,35 @@ export function NewAuditForm({ zones }: { zones: Zone[] }) {
     setState({ status: "idle", message: "" });
 
     try {
+      const auditPayload = {
+        zoneId: selectedZone.id,
+        zoneName: selectedZone.name,
+        auditorName,
+        shift,
+        answers: criteria.map((criterion) => ({
+          criterionLabel: criterion,
+          score: scores[criterion] ?? 0,
+          comment: comments[criterion] ?? "",
+        })),
+      };
+
+      console.log("[audit-debug][ui] 2. donnees envoyees", auditPayload);
       const response = await fetch("/api/audits", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          zoneId: selectedZone.id,
-          zoneName: selectedZone.name,
-          auditorName,
-          shift,
-          answers: criteria.map((criterion) => ({
-            criterionLabel: criterion,
-            score: scores[criterion] ?? 0,
-            comment: comments[criterion] ?? "",
-          })),
-        }),
+        body: JSON.stringify(auditPayload),
       });
       const payload = (await response.json()) as {
         auditId?: string;
         message?: string;
       };
+      console.log("[audit-debug][ui] 7. retour api", {
+        ok: response.ok,
+        status: response.status,
+        payload,
+      });
 
       if (!response.ok) {
         throw new Error(
@@ -146,27 +157,28 @@ export function NewAuditForm({ zones }: { zones: Zone[] }) {
         );
       }
 
+      if (!payload.auditId) {
+        throw new Error(
+          "Appwrite n'a pas retourné d'identifiant d'audit. L'audit n'est pas confirmé.",
+        );
+      }
+
       let photoWarning: string | undefined;
 
       if (pendingPhotoFiles.length > 0) {
-        if (!payload.auditId) {
+        try {
+          await uploadPhotos({
+            files: pendingPhotoFiles,
+            moduleType: "audit",
+            entityId: payload.auditId,
+            zoneId: selectedZone.id,
+            uploadedBy: auditorName,
+          });
+        } catch (photoError) {
           photoWarning =
-            "Audit enregistré, mais les photos n'ont pas pu être liées car l'identifiant audit est manquant.";
-        } else {
-          try {
-            await uploadPhotos({
-              files: pendingPhotoFiles,
-              moduleType: "audit",
-              entityId: payload.auditId,
-              zoneId: selectedZone.id,
-              uploadedBy: auditorName,
-            });
-          } catch (photoError) {
-            photoWarning =
-              photoError instanceof Error
-                ? `Audit enregistré, mais les photos n'ont pas été ajoutées : ${photoError.message}`
-                : "Audit enregistré, mais les photos n'ont pas été ajoutées.";
-          }
+            photoError instanceof Error
+              ? `Audit enregistré, mais les photos n'ont pas été ajoutées : ${photoError.message}`
+              : "Audit enregistré, mais les photos n'ont pas été ajoutées.";
         }
       }
 
@@ -177,12 +189,17 @@ export function NewAuditForm({ zones }: { zones: Zone[] }) {
         auditStatus: submittedAuditStatus,
         photoWarning,
       });
+      console.log("[audit-debug][ui] 7. retour UI success", {
+        auditId: payload.auditId,
+        photoWarning,
+      });
       clearAuditDraft();
       resetTimerRef.current = setTimeout(() => {
         resetAfterSuccessfulAudit();
         setState({ status: "idle", message: "" });
       }, 4500);
     } catch (error) {
+      console.error("[audit-debug][ui] 6. catch UI", error);
       setState({
         status: "error",
         message:

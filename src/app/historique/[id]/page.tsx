@@ -13,6 +13,7 @@ import {
   getAuditNavigation,
 } from "@/lib/data/audit-history-provider";
 import { readAppwritePhotos } from "@/lib/data/appwrite-service";
+import { formatAuditDateTime } from "@/lib/date-format";
 import type { PhotoMetadata } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export default async function AuditDetailPage({
       <PageHeader
         eyebrow="Detail audit"
         title={audit.zoneName || "Audit"}
-        description={`${formatDate(audit.createdAt)} - ${audit.auditorName || "Auditeur inconnu"} - ${audit.shift || "Poste non renseigne"}`}
+        description={`${formatAuditDateTime(audit.createdAt)} - ${audit.auditorName || "Auditeur inconnu"} - ${audit.shift || "Poste non renseigne"}`}
       />
 
       <AuditNavigation navigation={navigation} />
@@ -279,20 +280,4 @@ function FindingsSummary({
       )}
     </div>
   );
-}
-
-function formatDate(value: string | undefined) {
-  if (!value) {
-    return "Date inconnue";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("fr-FR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
 }

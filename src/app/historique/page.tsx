@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { getAuditScoreStatus } from "@/lib/audit-status";
 import { getAuditHistoryWithAnswers } from "@/lib/data/audit-history-provider";
+import { formatAuditDateTime } from "@/lib/date-format";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +90,7 @@ function AuditHistoryItem({
           </span>
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          {formatDate(audit.createdAt)} - {audit.auditorName || "Auditeur inconnu"} -{" "}
+          {formatAuditDateTime(audit.createdAt)} - {audit.auditorName || "Auditeur inconnu"} -{" "}
           {audit.shift || "Poste non renseigne"}
         </p>
       </div>
@@ -191,20 +192,4 @@ function normalizeValue(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/&/g, "et")
     .replace(/[^a-z0-9]+/g, "");
-}
-
-function formatDate(value: string | undefined) {
-  if (!value) {
-    return "Date inconnue";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("fr-FR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
 }

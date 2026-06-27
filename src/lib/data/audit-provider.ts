@@ -8,6 +8,7 @@ import {
   readAppwriteCorrectiveActions,
   readAppwriteZones,
 } from "@/lib/data/appwrite-service";
+import { formatAuditDate } from "@/lib/date-format";
 import type {
   Audit,
   AuditProvider,
@@ -277,7 +278,7 @@ function addAuditKpis(kpis: DashboardData["kpis"], audits: Audit[]) {
       label: "Dernier audit",
       value: latestAudit ? `${latestAudit.scorePercent}%` : "-",
       helper: latestAudit
-        ? `${latestAudit.zoneName} - ${formatDate(latestAudit.createdAt)}`
+        ? `${latestAudit.zoneName} - ${formatAuditDate(latestAudit.createdAt)}`
         : "Aucun audit enregistre",
       tone: "steel" as const,
       href: latestAudit ? `/historique/${latestAudit.$id}` : undefined,
@@ -307,17 +308,4 @@ function average(values: number[]) {
   return Math.round(
     validValues.reduce((sum, value) => sum + value, 0) / validValues.length,
   );
-}
-
-function formatDate(value: string | undefined) {
-  if (!value) {
-    return "date inconnue";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("fr-FR").format(date);
 }
